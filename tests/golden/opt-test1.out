@@ -1,0 +1,18 @@
+fraig> cirr tests.fraig/test1.aag
+
+fraig> ciropt
+
+fraig> cirsw
+
+fraig> cirp
+
+Circuit Statistics
+==================
+  PI         178
+  PO         123
+  AIG       1009
+------------------
+  Total     1310
+
+fraig> q -f
+

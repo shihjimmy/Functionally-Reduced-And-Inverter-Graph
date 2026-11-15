@@ -1,0 +1,8 @@
+fraig> cirr tests.fraig/sim01.aag
+
+fraig> cirv -f tests/data/and20.aag
+Verifying against "tests/data/and20.aag"...
+Error: different number of inputs!!
+
+fraig> q -f
+

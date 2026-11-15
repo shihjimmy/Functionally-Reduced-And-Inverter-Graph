@@ -1,0 +1,15 @@
+fraig> cirr tests.fraig/test1.aag
+
+fraig> cirsw
+
+fraig> ciropt
+
+fraig> cirstrash
+
+fraig> cirv
+Verifying against "tests.fraig/test1.aag"...
+123 outputs: 123 identical by structure, 0 proven by SAT, 0 different.
+Result: EQUIVALENT
+
+fraig> q -f
+

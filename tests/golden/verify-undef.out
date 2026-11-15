@@ -1,0 +1,20 @@
+fraig> cirr tests.fraig/strash05.aag
+
+fraig> cirstrash
+
+fraig> cirsim -r
+320 patterns simulated.
+
+fraig> cirfraig
+
+fraig> cirsw
+
+fraig> ciropt
+
+fraig> cirv
+Verifying against "tests.fraig/strash05.aag"...
+2 outputs: 2 identical by structure, 0 proven by SAT, 0 different.
+Result: EQUIVALENT
+
+fraig> q -f
+

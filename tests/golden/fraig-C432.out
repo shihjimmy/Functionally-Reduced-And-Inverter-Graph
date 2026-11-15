@@ -1,0 +1,24 @@
+fraig> cirr tests.fraig/ISCAS85/C432.aag
+
+fraig> cirsim -r
+640 patterns simulated.
+
+fraig> cirfraig
+
+fraig> cirp
+
+Circuit Statistics
+==================
+  PI          36
+  PO           7
+  AIG        238
+------------------
+  Total      281
+
+fraig> cirv
+Verifying against "tests.fraig/ISCAS85/C432.aag"...
+7 outputs: 1 identical by structure, 6 proven by SAT, 0 different.
+Result: EQUIVALENT
+
+fraig> q -f
+

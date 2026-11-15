@@ -1,0 +1,7 @@
+fraig> cirr tests.fraig/sim01.aag
+
+fraig> cirv -f tests/data/no-such-file.aag
+Error: cannot open file "tests/data/no-such-file.aag"!!
+
+fraig> q -f
+

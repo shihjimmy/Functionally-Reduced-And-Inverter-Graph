@@ -1,0 +1,16 @@
+# build directories
+/build*/
+*.o
+*.a
+
+# unpacked from tests.fraig/pattern.13.gz by scripts/bench.py
+/tests.fraig/pattern.13
+
+# OS junk
+._*
+.DS_Store
+Thumbs.db
+
+# scratch from scripts and profiling
+gmon.out
+*.log

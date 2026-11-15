@@ -1,0 +1,13 @@
+fraig> cirr tests.fraig/sim04.aag
+
+fraig> cirstrash
+
+fraig> cirsim -f tests.fraig/pattern.04
+
+Error: Pattern(01) length(2) does not match the number of inputs(1) in a circuit!!
+0 patterns simulated.
+
+fraig> cirp -fec
+
+fraig> q -f
+

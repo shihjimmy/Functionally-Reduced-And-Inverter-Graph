@@ -1,0 +1,13 @@
+fraig> cirr tests.fraig/opt04.aag
+
+fraig> cirsw
+
+fraig> ciropt
+
+fraig> cirp -n
+
+[0] CONST0
+[1] PO  3 0
+
+fraig> q -f
+

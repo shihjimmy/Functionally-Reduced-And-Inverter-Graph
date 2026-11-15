@@ -1,0 +1,185 @@
+/****************************************************************************
+  FileName     [ cmdParser.h ]
+  PackageName  [ cmd ]
+  Synopsis     [ Define class CmdParser ]
+  Author       [ Chung-Yang (Ric) Huang ]
+  Copyright    [ Copyleft(c) 2007-present LaDs(III), GIEE, NTU, Taiwan ]
+****************************************************************************/
+#ifndef CMD_PARSER_H
+#define CMD_PARSER_H
+
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <map>
+#include <stack>
+#include <memory>
+
+#include "cmdCharDef.h"
+
+
+//----------------------------------------------------------------------
+//    Forward Declaration
+//----------------------------------------------------------------------
+
+class CmdExec;
+class CmdParser;
+
+
+//----------------------------------------------------------------------
+//    External declaration
+//----------------------------------------------------------------------
+
+
+
+//----------------------------------------------------------------------
+//    command execution status
+//----------------------------------------------------------------------
+enum CmdExecStatus
+{
+   CMD_EXEC_DONE  = 0,
+   CMD_EXEC_ERROR = 1,
+   CMD_EXEC_QUIT  = 2,
+   CMD_EXEC_NOP   = 3,
+
+   // dummy
+   CMD_EXEC_TOT
+};
+
+enum CmdOptionError
+{
+   CMD_OPT_MISSING    = 0,
+   CMD_OPT_EXTRA      = 1,
+   CMD_OPT_ILLEGAL    = 2,
+   CMD_OPT_FOPEN_FAIL = 3,
+
+   // dummy
+   CMD_OPT_ERROR_TOT
+};
+
+
+//----------------------------------------------------------------------
+//    Base class : CmdExec
+//----------------------------------------------------------------------
+
+class CmdExec
+{
+public:
+   CmdExec() {}
+   virtual ~CmdExec() {}
+
+   virtual CmdExecStatus exec(const std::string&) = 0;
+   virtual void usage(std::ostream&) const = 0;
+   virtual void help() const = 0;
+
+   void setOptCmd(const std::string& str) { _optCmd = str; }
+   bool checkOptCmd(const std::string& check) const;  // Removed for TODO...
+   const std::string& getOptCmd() const { return _optCmd; }
+
+protected:
+   bool lexNoOption(const std::string&) const;
+   bool lexSingleOption(const std::string&, std::string&, bool optional = true) const;
+   bool lexOptions(const std::string&, std::vector<std::string>&, size_t nOpts = 0) const;
+   CmdExecStatus errorOption(CmdOptionError err, const std::string& opt) const;
+
+private:
+   std::string            _optCmd;
+};
+
+// Stage 9: the commands used to be declared with a macro, CmdClass(T).
+// They are ordinary classes now (cmdCommon.h, cirCmd.h): the compiler checks
+// them like any other code, "override" catches a wrong signature, and a
+// debugger shows real source lines.
+
+
+//----------------------------------------------------------------------
+//    Base class : CmdParser
+//----------------------------------------------------------------------
+
+class CmdParser
+{
+#define READ_BUF_SIZE    65536
+#define PG_OFFSET        10
+
+// The parser OWNS every registered command (docs/OWNERSHIP.md).
+using CmdMap = std::map<const std::string, std::unique_ptr<CmdExec>>;
+
+public:
+   CmdParser(const std::string& p) : _prompt(p),
+        _readBufPtr(_readBuf), _readBufEnd(_readBuf),
+        _historyIdx(0), _tabPressCount(0), _tempCmdStored(false) {}
+   // No destructor body needed: _cmdMap and the dofile stack own their
+   // objects through unique_ptr and free them by themselves.
+   virtual ~CmdParser() {}
+
+   [[nodiscard]] bool openDofile(const std::string& dof);
+   void closeDofile();
+
+   // Takes ownership of "e" (the signature says so); if registration fails,
+   // "e" is simply destroyed when the unique_ptr goes out of scope.
+   [[nodiscard]] bool regCmd(const std::string&, unsigned, std::unique_ptr<CmdExec> e);
+   CmdExecStatus execOneCmd();
+   // Execute one command line given as a string (used by the GUI server).
+   CmdExecStatus execCmdLine(const std::string& line);
+   void printHelps() const;
+
+   // public helper functions
+   void printHistory(int nPrint = -1) const;
+   CmdExec* getCmd(std::string);
+
+private:
+   // Private member functions
+   void resetBufAndPrintPrompt() {
+        _readBufPtr = _readBufEnd = _readBuf;
+        *_readBufPtr = 0;
+        _tabPressCount = 0;
+        printPrompt();
+   }
+   ParseChar getChar(std::istream&) const;
+   bool readCmd(std::istream&);
+   CmdExec* parseCmd(std::string&);
+   void listCmd(const std::string&);
+   bool listCmdDir(const std::string&);  // Removed for TODO...
+   void printPrompt() const { std::cout << _prompt; }
+   bool pushDofile();  // Removed for TODO's
+   bool popDofile();   // Removed for TODO's
+
+   // Helper functions
+   bool moveBufPtr(char* const);
+   bool deleteChar();
+   void insertChar(char, int = 1);
+   void deleteLine();
+   void reprintCmd();
+   void moveToHistory(int index);
+   bool addHistory();
+   void retrieveHistory();
+   #ifdef TA_KB_SETTING
+   void taTestOnly() {}
+   #endif
+
+   // Data members
+   const std::string _prompt;             // command prompt
+   std::unique_ptr<std::ifstream> _dofile;     // the dofile being read (owned); null: read stdin
+   char      _readBuf[READ_BUF_SIZE];// save the current line input
+                                     // be consistent as shown on the screen
+   char*     _readBufPtr;            // point to the cursor position
+                                     // also be the insert and delete point
+   char*     _readBufEnd;            // end of string position of _readBuf
+                                     // make sure *_readBufEnd = 0
+   std::vector<std::string>   _history;        // oldest:_history[0],latest:_hist.back()
+   int       _historyIdx;            // (1) Position to insert history string
+                                     //     i.e. _historyIdx = _history.size()
+                                     // (2) When up/down/pgUp/pgDn is pressed,
+                                     //     position to history to retrieve
+   size_t    _tabPressCount;         // The number of tab pressed
+   bool      _tempCmdStored;         // When up/pgUp is pressed, current line
+                                     // will be stored in _history and
+                                     // _tempCmdStored will be true.
+                                     // Reset to false when new command added
+   CmdMap    _cmdMap;                // map from string to command
+   std::stack<std::unique_ptr<std::ifstream>> _dofileStack;  // outer dofiles of nested DOfile calls (owned)
+};
+
+
+#endif // CMD_PARSER_H

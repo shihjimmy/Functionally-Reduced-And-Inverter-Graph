@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>fraig：AIG 電路化簡與等價檢查工具 — 設計報告</title>
+<style>
+@page { size: A4; margin: 20mm 18mm 20mm 18mm;
+  @bottom-center { content: counter(page); font-size: 9pt; color: #777; } }
+html { font-family: "Noto Serif CJK TC", "Noto Serif", serif; font-size: 10pt; line-height: 1.68; color: #222; }
+h1, h2, h3, h4, .title, th, .caption, .kicker { font-family: "Noto Sans CJK TC", "Noto Sans", sans-serif; }
+h1 { font-size: 18pt; margin: 0 0 6mm; padding-bottom: 2mm; border-bottom: 2px solid #0F6E56; color: #085041; page-break-before: always; }
+h2 { font-size: 13pt; margin: 7mm 0 2mm; color: #085041; page-break-after: avoid; }
+h3 { font-size: 11pt; margin: 5mm 0 1.5mm; color: #333; page-break-after: avoid; }
+p { margin: 0 0 2.5mm; text-align: justify; }
+code, pre { font-family: "DejaVu Sans Mono", "Noto Sans Mono CJK TC", monospace; font-size: 8.8pt; }
+code { background: #F3F2EE; padding: 0 3px; border-radius: 3px; }
+pre { background: #F7F6F2; border: 1px solid #E2E0D8; border-radius: 4px; padding: 3mm 4mm; line-height: 1.45; white-space: pre-wrap; page-break-inside: avoid; }
+pre code { background: none; padding: 0; }
+table { border-collapse: collapse; width: 100%; margin: 2mm 0 4mm; font-size: 9.4pt; }
+tr { page-break-inside: avoid; }
+table.keep { page-break-inside: avoid; }
+th { background: #E1F5EE; color: #085041; font-weight: 600; }
+th, td { border: 1px solid #CFCDC4; padding: 1.4mm 2.2mm; vertical-align: top; text-align: left; }
+td.n { text-align: right; font-variant-numeric: tabular-nums; }
+figure { margin: 4mm 0 5mm; text-align: center; page-break-inside: avoid; }
+figure img { max-width: 100%; }
+.caption, figcaption { font-size: 9pt; color: #555; margin-top: 1.5mm; }
+ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin-bottom: 1mm; }
+.note { border-left: 3px solid #0F6E56; background: #F2FAF6; padding: 2mm 4mm; margin: 3mm 0; page-break-inside: avoid; }
+.cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; }
+.cover .kicker { color: #0F6E56; font-size: 11pt; letter-spacing: 0.1em; }
+.cover .title { font-size: 28pt; font-weight: 700; color: #085041; line-height: 1.3; margin: 4mm 0; }
+.cover .sub { font-size: 13pt; color: #444; }
+.cover .meta { margin-top: 20mm; font-size: 10pt; color: #555; }
+.toc { page-break-before: always; }
+.toc h1 { page-break-before: avoid; }
+.toc ol { list-style: none; padding-left: 0; }
+.toc li { margin: 1.2mm 0; }
+.toc ol ol { padding-left: 7mm; font-size: 9.6pt; color: #444; }
+.toc a { color: inherit; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="kicker">資料結構與程式設計 · FRAIG 專題</div>
+  <div class="title">fraig：AIG 電路化簡<br>與等價檢查工具</div>
+  <div class="sub">設計報告：系統架構、類別關係、資料結構與演算法</div>
+  <div class="meta">
+    C++17 · CMake · MiniSat · 命令列與瀏覽器介面<br>
+    原始碼：README.md 說明建置與使用；本報告說明設計與實作<br><br>
+    本專題延伸自國立臺灣大學電機系「資料結構與程式設計」課程的 FRAIG 期末專題。
+  </div>
+</section>
+
+<section class="toc">
+<h1>目錄</h1>
+<ol>
+  <li><a href="#s1">1. 專題說明</a>
+    <ol><li>1.1 問題背景　1.2 AIG 與 AIGER 格式　1.3 FRAIG 的流程　1.4 規格要求與流程規則　1.5 本實作的特色</li></ol></li>
+  <li><a href="#s2">2. 使用方式</a></li>
+  <li><a href="#s3">3. 系統架構</a>
+    <ol><li>3.1 分層與依賴方向　3.2 一條指令的執行路徑　3.3 目錄結構</li></ol></li>
+  <li><a href="#s4">4. 類別與關係</a>
+    <ol><li>4.1 類別圖　4.2 各類別的責任　4.3 所有權與借用　4.4 型別安全的設計</li></ol></li>
+  <li><a href="#s5">5. 資料結構</a></li>
+  <li><a href="#s6">6. 演算法</a>
+    <ol><li>6.1 讀檔　6.2 改電路的三個基本操作　6.3 Sweep　6.4 Optimize　6.5 Strash　6.6 模擬與 FEC 群組　6.7 Fraig　6.8 CIRVerify　6.9 流程規則</li></ol></li>
+  <li><a href="#s7">7. 圖形介面</a></li>
+  <li><a href="#s8">8. 測試與驗證</a></li>
+  <li><a href="#s9">9. 效能</a></li>
+  <li><a href="#s10">10. 複雜度總表、限制與未來工作</a></li>
+</ol>
+</section>
+
+<!-- ========================================================= -->
+<h1 id="s1">1. 專題說明</h1>
+
+<h2>1.1 問題背景</h2>
+<p>
+數位電路設計流程中，電路會經過許多次自動轉換（合成、技術映射、插入測試電路等）。每次轉換都可能留下多餘的邏輯：
+沒有接到任何輸出的閘、可以被常數化簡的閘、結構不同但功能完全相同的閘。把這些多餘的邏輯找出來並移除，
+可以讓電路變小，也讓後續的驗證工具跑得更快。
+</p>
+<p>
+本專題實作一個這樣的工具：讀入一個組合邏輯電路，在<strong>不改變功能</strong>的前提下把它化簡，
+並且能夠<strong>自己證明</strong>化簡後的電路和原電路對所有輸入都有相同的輸出。
+「功能相同」的判斷是整個專題的核心難題：兩個閘的功能是否相同，等價於問「是否存在一組輸入讓它們的輸出不同」，
+這是一個布林可滿足性（SAT）問題，屬於 NP-complete。實作的重點因此是：用便宜的方法（結構比對、平行模擬）
+處理掉絕大多數的情況，只把真正需要的問題交給 SAT 求解器，並且讓每個 SAT 問題盡量小。
+</p>
+
+<h2>1.2 AIG 與 AIGER 格式</h2>
+<p>
+任何組合邏輯都可以只用「兩輸入 AND 閘」和「反相器」表示，這種表示法稱為 AIG（And-Inverter Graph）。
+在 AIG 中，節點有四種：主要輸入（PI）、主要輸出（PO）、AND 閘、常數 0；每條邊可以帶一個反相標記。
+因為只有一種邏輯閘，所有演算法都只需要處理一種情況，這是 AIG 在邏輯合成與驗證工具中被廣泛使用的原因。
+</p>
+<p>
+AIGER 是 AIG 的標準檔案格式。本專題讀寫 ASCII 版（<code>.aag</code>）：
+</p>
+<pre><code>aag 7 2 0 2 3        ← M I L O A：最大變數編號、輸入數、latch 數、輸出數、AND 閘數
+2                    ← 輸入：變數 1
+4                    ← 輸入：變數 2
+12                   ← 輸出：變數 6
+15                   ← 輸出：變數 7 的反相
+6 2 4                ← AND：變數 3 = 變數 1 AND 變數 2
+12 6 3               ← AND：變數 6 = 變數 3 AND (NOT 變數 1)
+14 4 7               ← AND：變數 7 = 變數 2 AND (NOT 變數 3)
+i0 a                 ← 符號表：輸入與輸出的名字（可選）
+c                    ← 註解開始</code></pre>
+<p>
+literal <code>2v</code> 代表變數 <code>v</code>，<code>2v+1</code> 代表它的反相；literal 0 和 1 是常數 0 和 1。
+本專題只處理組合電路（L = 0）。檔案中可能出現「被引用但沒有定義」的變數（UNDEF），
+也可能有「定義了但沒有被任何人使用」的閘，兩者都要被正確處理和報告。
+</p>
+
+<h2>1.3 FRAIG 的流程</h2>
+<p>
+FRAIG（Functionally Reduced AIG）是指「沒有任何兩個節點功能相同」的 AIG。從一般的 AIG 得到 FRAIG 的流程如下：
+</p>
+<table class="keep">
+<tr><th style="width:18%">步驟</th><th>做什麼</th><th style="width:26%">怎麼判斷</th></tr>
+<tr><td>Sweep</td><td>移除走不到任何 PO 的閘</td><td>從 PO 出發的可達性</td></tr>
+<tr><td>Optimize</td><td>常數傳播與簡單化簡：<code>a&amp;0=0</code>、<code>a&amp;1=a</code>、<code>a&amp;a=a</code>、<code>a&amp;!a=0</code></td><td>只看兩個 fanin</td></tr>
+<tr><td>Strash</td><td>兩個 AND 閘的 fanin 完全相同就合併</td><td>結構雜湊</td></tr>
+<tr><td>Simulate</td><td>對大量輸入樣本求值，把「到目前為止輸出都相同或都相反」的閘分成同一組，稱為 FEC 群組（functionally equivalent candidates）</td><td>64 位元平行模擬</td></tr>
+<tr><td>Fraig</td><td>對 FEC 群組裡的每一對閘問 SAT：證明等價就合併；不等價就得到一組反例輸入，拿去模擬，把群組切細</td><td>SAT 求解器（MiniSat）</td></tr>
+</table>
+<p>
+前三步是純結構的、便宜的化簡；後兩步處理「結構不同但功能相同」的情況。模擬只能說「可能等價」
+（因為只試了有限多組輸入），能說「一定不等價」；SAT 才能說「一定等價」。兩者互補：模擬先把明顯不同的閘分開，
+SAT 只需要處理剩下的候選。
+</p>
+
+<h2>1.4 規格要求與流程規則</h2>
+<p>
+專題規格定義了一組指令（第 2 章）以及它們的輸出格式和錯誤訊息，報告類指令的輸出要和課程提供的參考程式逐字相同。
+規格也規定了指令之間的順序限制（流程規則）：
+</p>
+<ul>
+  <li>模擬之後，在做 fraig 之前不能 optimize 或 strash（否則 FEC 群組會和電路對不上）；</li>
+  <li>不能連續 strash 兩次（第二次一定沒有效果）；</li>
+  <li>fraig 之前必須先模擬（fraig 需要 FEC 群組）。</li>
+</ul>
+<p>
+違反時印出規格指定的錯誤訊息，電路不變。這些規則集中在 <code>CirMgr::whyNot()</code>（6.9 節）。
+</p>
+<p>
+fraig 的結果不是唯一的：合併的順序、模擬用的隨機樣本都會影響最後的電路。因此 fraig 之後的電路無法和參考程式逐字比較，
+正確性必須用「和原電路功能等價」來檢查，這是本專題另外實作獨立等價檢查器 <code>CIRVerify</code> 的原因（6.8 節）。
+</p>
+
+<h2>1.5 本實作的特色</h2>
+<ul>
+  <li><strong>完整的 FRAIG 流程</strong>：規格的所有指令、報告格式與錯誤訊息；非 fraig 的輸出和參考程式逐字一致。</li>
+  <li><strong>獨立的等價檢查器</strong>：<code>CIRVerify</code> 自己重新解析檔案、建自己的圖，用結構雜湊、模擬和 SAT sweeping
+    證明目前電路與原檔等價，不等價時給出經過重新模擬確認的反例。它不共用化簡用的任何程式碼。</li>
+  <li><strong>瀏覽器圖形介面</strong>：電路依邏輯深度分層畫出；每個指令一個按鈕，執行後以動畫呈現被移除與被改接的閘；
+    模擬後同一 FEC 群組同色；長指令在背景執行並顯示進度。</li>
+  <li><strong>效能</strong>：完整 fraig 流程比參考程式快 2 到 7 倍（第 9 章），每個結果都經 <code>CIRVerify</code> 證明等價。</li>
+  <li><strong>工程品質</strong>：C++17、明確的記憶體所有權（<code>unique_ptr</code> 擁有、裸指標借用）、沒有全域變數、
+    CMake 建置、92 個自動測試、GitHub Actions 以 g++、clang++ 與 sanitizer 版本持續整合，零編譯警告。</li>
+</ul>
+
+<!-- ========================================================= -->
+<h1 id="s2">2. 使用方式</h1>
+
+<h2>2.1 建置</h2>
+<pre><code>cmake -S . -B build -G Ninja
+cmake --build build              # 產生 build/fraig
+ctest --test-dir build -j4       # 92 個自動測試</code></pre>
+<p>需要 C++17 編譯器（g++ 9+ 或 clang++ 10+）與 CMake 3.16+。單元測試使用的 GoogleTest 在設定時以 git 取得，
+離線時可加 <code>-DFRAIG_UNIT_TESTS=OFF</code>。<code>-DFRAIG_SANITIZE=ON</code> 建出 AddressSanitizer + UBSan 版本，
+<code>-DFRAIG_WERROR=ON</code> 把警告當錯誤。</p>
+
+<h2>2.2 命令列</h2>
+<pre><code>build/fraig                      # 互動模式（Tab 補全、上下鍵歷史）
+build/fraig -File run.dofile     # 執行指令腳本</code></pre>
+<table>
+<tr><th style="width:42%">指令</th><th>作用</th></tr>
+<tr><td><code>CIRRead &lt;file&gt; [-Replace]</code></td><td>讀入電路</td></tr>
+<tr><td><code>CIRPrint [-Summary|-Netlist|-PI|-PO|-FLoating|-FECpairs]</code></td><td>統計、網表、輸入輸出、浮接與未使用的閘、FEC 群組</td></tr>
+<tr><td><code>CIRGate &lt;id&gt; [-FANIn|-FANOut &lt;level&gt;]</code></td><td>單一閘的資訊、模擬值、FEC 夥伴、fanin／fanout 樹</td></tr>
+<tr><td><code>CIRSWeep</code>、<code>CIROPTimize</code>、<code>CIRSTRash</code></td><td>結構化簡</td></tr>
+<tr><td><code>CIRSIMulate -Random|-File &lt;f&gt; [-Output &lt;log&gt;]</code></td><td>隨機或檔案樣本模擬，建立 FEC 群組</td></tr>
+<tr><td><code>CIRFraig</code></td><td>以 SAT 證明並合併 FEC 群組</td></tr>
+<tr><td><code>CIRWrite [&lt;id&gt;] [-Output &lt;f&gt;]</code></td><td>輸出 AIGER（整個電路或某個閘的 fanin 錐）</td></tr>
+<tr><td><code>CIRVerify [-File &lt;f&gt;]</code></td><td>證明目前電路和原檔（或指定檔案）等價</td></tr>
+<tr><td><code>CIRJson</code></td><td>以 JSON 輸出電路（GUI 使用）</td></tr>
+<tr><td><code>HELp</code>、<code>HIStory</code>、<code>DOfile</code>、<code>USAGE</code>、<code>Quit</code></td><td>一般指令</td></tr>
+</table>
+<p>指令不分大小寫，大寫部分是可縮寫到的最短形式。一個典型的流程：</p>
+<pre><code>fraig&gt; cirr tests.fraig/sim07.aag
+fraig&gt; cirsim -r
+fraig&gt; cirfraig
+fraig&gt; cirsw
+fraig&gt; ciropt
+fraig&gt; cirv
+Verifying against "tests.fraig/sim07.aag"...
+195 outputs: 10 identical by structure, 185 proven by SAT, 0 different.
+Result: EQUIVALENT</code></pre>
+
+<h2>2.3 圖形介面</h2>
+<p><code>build/fraig -Gui [port]</code> 啟動本機 HTTP 伺服器（只接受 127.0.0.1），在瀏覽器開 <code>http://localhost:8080</code>。
+左側選檔案、按指令按鈕；中間是電路圖；右側是統計與指令紀錄。</p>
+<figure><img src="../images/gui_simulated.png" style="width:92%"><figcaption>圖 2-1　模擬之後：同色的閘屬於同一個 FEC 群組（可能等價）</figcaption></figure>
+<figure><img src="../images/gui_fraig_verify.png" style="width:92%"><figcaption>圖 2-2　fraig 與 verify 之後：等價的閘已合併，紀錄區顯示 EQUIVALENT</figcaption></figure>
+
+<!-- ========================================================= -->
+<h1 id="s3">3. 系統架構</h1>
+
+<h2>3.1 分層與依賴方向</h2>
+<figure><img src="../images/architecture.svg" style="width:82%"><figcaption>圖 3-1　分層架構：箭頭是呼叫方向，下層不認識上層</figcaption></figure>
+<p>程式分成五層，每一層只依賴它下面的層：</p>
+<table class="keep">
+<tr><th style="width:16%">層</th><th style="width:22%">目錄</th><th>責任</th></tr>
+<tr><td>前端</td><td><code>src/main/</code></td><td><code>main()</code> 建立所有物件；命令列迴圈；<code>GuiServer</code> 與內嵌網頁</td></tr>
+<tr><td>cmd</td><td><code>src/cmd/</code></td><td>通用的指令框架：讀一行、找到指令、執行；歷史、補全、dofile。完全不知道電路的存在</td></tr>
+<tr><td>cir</td><td><code>src/cir/</code></td><td>電路相關的指令與所有演算法；獨立的等價檢查器</td></tr>
+<tr><td>util</td><td><code>src/util/</code></td><td>字串處理、量時間與記憶體等小工具</td></tr>
+<tr><td>sat</td><td><code>src/sat/</code></td><td>MiniSat（第三方程式碼，不修改）</td></tr>
+</table>
+<p>
+這個方向讓 cmd 層可以原封不動地用在別的專案；新增一個電路指令只需要在 cir 層寫一個類別並在 <code>main()</code> 註冊。
+</p>
+<div class="note">
+<strong>GUI 不直接呼叫電路程式碼。</strong>每個按鈕送出的是一個指令字串（例如 <code>CIRSTRash</code>），
+走和鍵盤輸入完全相同的 <code>CmdParser</code>；GUI 需要的電路資料由 <code>CIRJson</code> 指令以 JSON 提供。
+因此 CLI 和 GUI 的行為不可能不一致，GUI 也不需要知道 <code>CirMgr</code> 的內部結構。
+</div>
+
+<h2>3.2 一條指令的執行路徑</h2>
+<ol>
+  <li><code>CmdParser</code> 從鍵盤、dofile 或 GUI 取得一行文字，以第一個字查指令表（支援縮寫）。</li>
+  <li>找到對應的 <code>CmdExec</code> 物件，呼叫它的 <code>exec(選項字串)</code>。</li>
+  <li>電路指令（<code>CirCommand</code> 的子類別）解析選項、檢查有沒有電路、問 <code>CirMgr::whyNot()</code> 流程上能不能做，
+    能做就呼叫 <code>CirMgr</code> 的對應方法，不能做就印出錯誤訊息。</li>
+  <li><code>CirMgr</code> 執行演算法、更新電路與「上一步」紀錄。</li>
+</ol>
+
+<h2>3.3 目錄結構</h2>
+<pre><code>src/cir/     cirMgr（電路與讀寫）、cirGate（閘）、cirCmd（指令）、cirOpt（sweep / optimize 與基本操作）、
+             cirSim（模擬與 FEC）、cirFraig（strash / fraig）、cirVerify（等價檢查）、cirCheck（一致性檢查）、cirJson
+src/cmd/     CmdParser、CmdExec、一般指令
+src/main/    main()、guiServer、guiPage.h（內嵌網頁）
+src/util/    工具函式、MyUsage
+src/sat/     MiniSat
+tests/       cases.txt 與黃金輸出、unit/（GoogleTest）、隨機電路與模糊測試工具
+scripts/     與參考程式比對、等價檢查、效能量測
+docs/        本報告、設計文件、效能紀錄</code></pre>
+
+<!-- ========================================================= -->
+<h1 id="s4">4. 類別與關係</h1>
+
+<h2>4.1 類別圖</h2>
+<figure><img src="../images/classes.svg" style="width:100%"><figcaption>圖 4-1　主要類別與關係：實線箭頭為擁有，虛線為參考／借用，空心三角為繼承</figcaption></figure>
+
+<h2>4.2 各類別的責任</h2>
+<table>
+<tr><th style="width:24%">類別</th><th>責任</th><th style="width:28%">擁有／借用</th></tr>
+<tr><td><code>CirSession</code></td><td>「目前的電路」，可能沒有（讀檔前或讀檔失敗）</td><td>擁有 <code>unique_ptr&lt;CirMgr&gt;</code>；由 <code>main()</code> 持有</td></tr>
+<tr><td><code>CirMgr</code></td><td>一個電路：讀寫 AIGER、sweep／optimize／strash、模擬、FEC 群組、fraig、報告、流程規則、一致性檢查</td><td>擁有所有閘</td></tr>
+<tr><td><code>CirMgr::AagLexer</code></td><td>讀一個檔案時的 parser 狀態（目前行號、欄位、錯誤訊息）</td><td>讀檔函式的區域變數</td></tr>
+<tr><td><code>CirGate</code></td><td>閘的抽象基底：ID、行號、型別、模擬值、FEC 編號、SAT 變數、走訪標記</td><td>被 <code>CirMgr</code> 擁有</td></tr>
+<tr><td><code>CirPiGate</code>、<code>CirPoGate</code>、<code>CirAigGate</code>、<code>CirConstGate</code>、<code>CirUndefGate</code></td><td>五種閘；PO 有一個 fanin，AIG 有兩個，PI／PO 有名字</td><td>同上</td></tr>
+<tr><td><code>CirGateV</code></td><td>一條邊：閘指標 + 反相位元，8 bytes</td><td>借用閘</td></tr>
+<tr><td><code>CmdParser</code></td><td>指令註冊表、讀指令、dofile 堆疊、歷史</td><td>擁有所有指令物件；由 <code>main()</code> 持有</td></tr>
+<tr><td><code>CmdExec</code></td><td>指令的抽象介面：<code>exec</code>、<code>usage</code>、<code>help</code></td><td>—</td></tr>
+<tr><td><code>CirCommand</code></td><td>電路指令的基底，存 <code>CirSession&amp;</code>；11 個子類別（CirRead、CirPrint……CirVerify、CirJson）</td><td>借用 session</td></tr>
+<tr><td><code>ParserCommand</code></td><td>需要操作 parser 的指令基底，存 <code>CmdParser&amp;</code>；子類別 Help、History、Dofile</td><td>借用 parser</td></tr>
+<tr><td><code>UsageCmd</code>、<code>QuitCmd</code></td><td>量時間／記憶體；離開</td><td><code>UsageCmd</code> 擁有 <code>MyUsage</code></td></tr>
+<tr><td><code>GuiServer</code></td><td>HTTP 伺服器、背景工作執行緒、工作紀錄與進度</td><td>擁有 <code>Job</code>，借用 <code>CmdParser</code></td></tr>
+<tr><td><code>AagFile</code>、<code>Graph</code>、<code>Simulator</code>、<code>SatSweeper</code></td><td><code>CIRVerify</code> 自己的解析器、結構雜湊圖、模擬器、SAT sweeping；只在 <code>cirVerify.cpp</code> 內可見</td><td><code>verifyAag()</code> 的區域物件</td></tr>
+<tr><td><code>VerifyResult</code></td><td>驗證結論、各類輸出的計數、反例</td><td>值</td></tr>
+<tr><td><code>SatSolver</code></td><td>MiniSat 的包裝</td><td>fraig 與 verify 各自建立區域物件</td></tr>
+</table>
+
+<h2>4.3 所有權與借用</h2>
+<p>整個專案（MiniSat 除外）遵守一條規則：<strong><code>std::unique_ptr</code> 代表擁有，裸指標或參考代表借用。</strong>
+程式中沒有手寫的 <code>new</code> 和 <code>delete</code>，也沒有全域變數。</p>
+<ul>
+  <li><code>main()</code> 以區域變數持有 <code>CirSession</code> 與 <code>CmdParser</code>，它們的壽命就是程式的壽命；
+    指令物件在建構時拿到它們的參考。原本課程程式碼用的全域 <code>cirMgr</code> 因此不存在，每個函式需要什麼都從參數或成員取得。</li>
+  <li><code>CirMgr::_gates</code>（<code>vector&lt;unique_ptr&lt;CirGate&gt;&gt;</code>）以 ID 為索引擁有每個閘；
+    <code>_piList</code>、<code>_dfsList</code>、fanin、fanout 清單裡的 <code>CirGate*</code> 全部是借用。</li>
+  <li>被合併或移除的閘，所有權用 <code>std::move</code> 從 <code>_gates</code> 轉到 <code>_retired</code>，
+    在指令結束重建清單時才一起釋放（6.2 節說明原因）。</li>
+  <li>因為成員都是會自己釋放資源的型別，<code>CirMgr</code> 等類別不需要寫解構子、複製建構子（Rule of Zero）；
+    <code>unique_ptr</code> 不能複製，所以電路也不會被意外複製。</li>
+</ul>
+
+<h2>4.4 型別安全的設計</h2>
+<ul>
+  <li><strong>閘的型別</strong>是 <code>enum class GateType : unsigned char</code>，建構時存進基底的 <code>_type</code>。
+    判斷型別是一般的比較（不用 <code>dynamic_cast</code>），<code>asAig()</code> 在確定是 AND 閘時回傳 <code>CirAigGate*</code>。
+    處理任何閘的程式用 <code>numFanins()</code>／<code>fanin(i)</code>，不需要知道具體型別。</li>
+  <li><strong>邊</strong> <code>CirGateV</code> 只能從閘指標明確建構（<code>explicit</code>），沒有和整數之間的隱式轉換；
+    反相是值運算 <code>~e</code>、<code>e ^ inv</code>；<code>explicit operator bool</code> 判斷是不是空邊。</li>
+  <li><strong>流程</strong>用 <code>enum class CirStep</code> 表示，<code>whyNot()</code> 回傳 <code>std::optional&lt;std::string_view&gt;</code>：
+    沒有值代表可以做，有值就是錯誤訊息。</li>
+  <li><strong>記憶體大小</strong>以 <code>static_assert</code> 固定：<code>CirGateV</code> 8 bytes、<code>CirAigGate</code> 64 bytes。
+    大電路有數十萬個閘，每個閘多 8 bytes 就是數 MB，所以成員的排列順序是刻意的。</li>
+</ul>
+
+<!-- ========================================================= -->
+<h1 id="s5">5. 資料結構</h1>
+
+<h2>5.1 閘</h2>
+<table class="keep">
+<tr><th style="width:24%">成員</th><th>意義</th></tr>
+<tr><td><code>_id</code>、<code>_lineNo</code></td><td>變數編號與檔案中的行號</td></tr>
+<tr><td><code>_pValue</code></td><td>64 位元模擬值：第 k 位是第 k 個樣本下的輸出</td></tr>
+<tr><td><code>_fecId</code></td><td>所屬 FEC 群組的編號 ×2 + 相位；不在群組裡時為特殊值</td></tr>
+<tr><td><code>_type</code></td><td><code>GateType</code>：PI、PO、AIG、CONST、UNDEF</td></tr>
+<tr><td><code>_satVar</code></td><td>在 fraig 的 SAT 模型中的變數；尚未建立時為 <code>kNoSatVar</code></td></tr>
+<tr><td><code>_ref</code></td><td>走訪標記；和全域計數器比較，換一次走訪只要把計數器加一，不用逐一清除</td></tr>
+<tr><td><code>_in0</code>、<code>_in1</code></td><td>（AIG）兩條 fanin 邊；PO 只有 <code>_in0</code></td></tr>
+</table>
+
+<h2>5.2 邊：<code>CirGateV</code></h2>
+<pre><code>class CirGateV {
+   std::uintptr_t _bits = 0;              // 閘指標 | 反相位元
+   static constexpr std::uintptr_t INV_BIT = 1;
+public:
+   explicit CirGateV(CirGate* g, bool inv = false);
+   CirGate* gate() const { return reinterpret_cast&lt;CirGate*&gt;(_bits &amp; ~INV_BIT); }
+   bool     isInv() const { return _bits &amp; INV_BIT; }
+   CirGateV operator~() const;            // 同一個閘、相反的相位
+};</code></pre>
+<p>閘物件至少 2 bytes 對齊（以 <code>static_assert(alignof(CirGate) &gt;= 2)</code> 保證），所以指標的最低位元一定是 0，
+可以拿來存反相旗標。一條邊因此只佔一個指標的空間，而且「取閘」和「取相位」都是一個位元運算。</p>
+
+<h2>5.3 電路：<code>CirMgr</code></h2>
+<table class="keep">
+<tr><th style="width:22%">成員</th><th>意義</th><th style="width:24%">何時更新</th></tr>
+<tr><td><code>_gates[id]</code></td><td>擁有每個閘；ID 直接索引，O(1) 查詢；<code>[0]</code> 是常數 0；被移除的位置為空</td><td>讀檔、移除閘</td></tr>
+<tr><td><code>_piList</code>、<code>_poList</code></td><td>輸入、輸出，依檔案順序</td><td>讀檔</td></tr>
+<tr><td><code>_fanoutInfo[id]</code></td><td>每個閘的 fanout 清單。一條邊一筆：同一個閘的兩個 fanin 都接到 X，X 的清單裡就有它兩次，搬移 fanout 時不需要特例</td><td>讀檔、合併閘</td></tr>
+<tr><td><code>_dfsList</code></td><td>從 PO 出發的 DFS 後序：每個閘的 fanin 都排在它前面</td><td>每個改電路的指令結束時</td></tr>
+<tr><td><code>_undefList</code>、<code>_floatList</code>、<code>_unusedList</code></td><td>由網表推導出的報告清單</td><td>同上</td></tr>
+<tr><td><code>_fecGrps</code></td><td>FEC 群組（5.4 節）</td><td>模擬、fraig</td></tr>
+<tr><td><code>_retired</code></td><td>擁有已從網表移除、但還沒釋放的閘</td><td>合併／移除時加入，指令結束時清空</td></tr>
+<tr><td><code>_lastStep</code></td><td>上一個改電路的步驟，用於流程規則</td><td>每個指令</td></tr>
+</table>
+<p><strong>DFS 後序是幾乎所有演算法的基礎。</strong>依這個順序處理，走到某個閘時它的 fanin 都已經處理完、不會再改變，
+所以 optimize、strash、模擬都只需要走一遍。</p>
+
+<h2>5.4 FEC 群組</h2>
+<p>每個群組是一個 <code>vector&lt;unsigned&gt;</code>，存 <code>閘 ID × 2 + 相位</code>，依 ID 排序；相位是相對於組內第一個成員，
+所以第一個成員一定是正相。例如群組 <code>{6, 13, 20}</code> 代表「閘 3、閘 6 的反相、閘 10」到目前為止的模擬值都相同。
+每個閘的 <code>_fecId</code> 記錄所在群組的索引與相位，所以 <code>CIRGate</code> 能在 O(1) 找到自己的夥伴。
+常數 0 也參加分組，和它同組的閘就是「可能是常數」的閘。</p>
+
+<!-- ========================================================= -->
+<h1 id="s6">6. 演算法</h1>
+<p>以下 n 是閘數，e 是邊數（約 2n）。</p>
+
+<h2>6.1 讀檔：<code>AagLexer</code> 與兩階段連接</h2>
+<p>讀檔分兩階段。<strong>第一階段</strong>由 <code>AagLexer</code> 逐行讀取，檢查格式（缺少空白、數字超出範圍、
+literal 重複定義、輸入不能是常數等），建立閘物件，但 fanin 只以 literal 暫存在 <code>PendingFanins</code>，
+因為一個閘的 fanin 可能定義在檔案的後面。任何錯誤都印出規格指定的訊息與行號、欄號，並放棄這個檔案。
+<strong>第二階段</strong> <code>connectFanins()</code> 在所有閘都建好之後，依 ID 順序把 literal 轉成 <code>CirGateV</code>，
+同時建立 fanout 清單；引用到不存在的變數時建立 UNDEF 閘。最後建立 DFS 與報告清單。總共 O(檔案大小)。</p>
+<p>讀檔成功時同時保存原檔文字，供 <code>CIRVerify</code> 之後比較。</p>
+
+<h2>6.2 改電路的三個基本操作</h2>
+<p>sweep、optimize、strash、fraig 都會改電路，它們共用三個操作，所有簿記只寫一次：</p>
+<table class="keep">
+<tr><th style="width:26%">操作</th><th>內容</th></tr>
+<tr><td><code>mergeGate(old, driver)</code></td><td>把 old 的每個 fanout 改接到 driver（帶上相位），然後 retire old</td></tr>
+<tr><td><code>retireGate(g)</code></td><td>把 g 從它 fanin 的 fanout 清單拿掉，更新計數，所有權從 <code>_gates[id]</code> 移到 <code>_retired</code>；記憶體暫不釋放</td></tr>
+<tr><td><code>rebuildDerivedLists()</code></td><td>刪掉沒人引用的 UNDEF，重建 DFS、浮接、未使用清單，最後清空 <code>_retired</code> 釋放記憶體</td></tr>
+</table>
+<div class="note">
+<strong>為什麼先 retire、最後才釋放？</strong>指令通常一邊走 DFS 清單的副本一邊合併閘。如果合併時立刻釋放，
+副本裡還留著那個指標，下一步就可能讀到已釋放的記憶體。延後釋放讓「走訪中的指標一定有效」成為整個指令期間都成立的保證，
+不需要在每個地方檢查。fraig 在走訪途中還要做模擬，這個保證更加重要。
+</div>
+<p><strong>為什麼推導清單整個重算？</strong>重算是 O(n)，而指令本身就是 O(n)，不改變複雜度；逐步維護容易漏掉情況
+（例如某閘失去最後一個 fanout 而變成「未使用」）。這裡選擇簡單、不會錯的做法。</p>
+
+<h2>6.3 Sweep：移除走不到 PO 的閘 — O(n)</h2>
+<ol>
+  <li>標記 DFS 清單裡的閘以及它們的 fanin（UNDEF 不在 DFS 清單裡，要從 fanin 標到）。</li>
+  <li>依 ID 由小到大，沒被標記的 AIG 與 UNDEF 一律 retire 並印出；PI、PO、常數永遠保留。</li>
+  <li>重建推導清單。</li>
+</ol>
+
+<h2>6.4 Optimize：常數傳播與簡單化簡 — O(n + e)</h2>
+<p>依 DFS 順序檢查每個 AND 閘 <code>g = a AND b</code>：</p>
+<table class="keep">
+<tr><th>條件</th><th>結果</th></tr>
+<tr><td>某個 fanin 是常數 1</td><td>g 等於另一個 fanin</td></tr>
+<tr><td>某個 fanin 是常數 0</td><td>g = 0</td></tr>
+<tr><td>a 與 b 是同一個訊號</td><td>g = a</td></tr>
+<tr><td>a 與 b 互為反相</td><td>g = 0</td></tr>
+</table>
+<p>成立就 <code>mergeGate(g, 結果)</code>。<strong>一遍就夠</strong>：DFS 順序保證走到 g 時 fanin 已經是最終的樣子；
+若 g 被化簡成常數，它的 fanout 在之後才被走到，會看到這個常數並繼續傳播。</p>
+
+<h2>6.5 Strash：結構雜湊 — 平均 O(n)</h2>
+<p>依 DFS 順序，以「兩條 fanin 邊（指標 + 相位）排序後的組合」為鍵查 <code>std::unordered_map</code>：查不到就放進去；
+查得到代表已有一個結構完全相同的閘，<code>mergeGate(g, 那個閘)</code>。排序讓 <code>AND(a,b)</code> 和 <code>AND(b,a)</code> 得到同一個鍵。
+同樣因為 DFS 順序，「前面合併之後才變得相同」的閘在同一遍裡就會被找到。</p>
+
+<h2>6.6 模擬與 FEC 群組 — 每 64 個樣本 O(n)</h2>
+<h3>64 位元平行模擬</h3>
+<p>每個閘的值是一個 64 位元字，第 k 位是第 k 個樣本下的值。依 DFS 順序算一遍：AND 是位元 <code>&amp;</code>，反相是 <code>~</code>。
+一次走訪就模擬了 64 個樣本，這是模擬比 SAT 便宜得多的原因。UNDEF 依規格當作 0。</p>
+<h3>切分群組</h3>
+<ul>
+  <li><strong>第一批樣本</strong>：所有 DFS 中的 AND 閘加上常數 0 一起分組。值 v 和 ~v 視為同一組（反相等價），
+    鍵取「v 與 ~v 之中最低位元為 0 的那個」，同時記錄每個成員的相位。</li>
+  <li><strong>之後的每批</strong>：每個群組獨立切分。組內成員在之前所有樣本上已經<em>依各自的相位</em>相等，
+    所以新的值也必須依<em>同一個相位</em>相等，鍵是「依相位修正後的值」。若依「v 或 ~v」重新分組，
+    會讓「之前相等、這批剛好全部相反」的一對錯誤地留在同組，相位悄悄翻轉；fraig 的反例很容易觸發這個情況。</li>
+  <li><strong>快速路徑</strong>：先檢查組內所有成員修正後的值是否都相同（最常見的情況），相同就原封不動保留；
+    16 個成員以下用線性搜尋代替雜湊表。群組被切成單一成員就丟掉。</li>
+</ul>
+<h3>隨機模擬何時停</h3>
+<p>每做 64 個樣本，檢查群組數與成員總數有沒有改變；連續 k 批沒變就停，<code>k = clamp(AIG 數 / 100, 4, 32)</code>。
+電路越大越有耐心，因為大電路的群組需要更多樣本才會被切開。</p>
+<h3>檔案模擬</h3>
+<p>每讀滿 64 個樣本模擬一次，最後不滿 64 個的部分補 0。格式錯誤（長度不符、非 0/1 字元）就停止並印出規格的錯誤訊息，
+之前已模擬的結果保留。<code>-Output</code> 把每個樣本的輸出寫成 log。</p>
+
+<h2>6.7 Fraig：用 SAT 證明並合併</h2>
+<figure><img src="../images/fraig_flow.svg" style="width:78%"><figcaption>圖 6-1　fraig 對每個 FEC 成員的處理</figcaption></figure>
+<h3>SAT 模型：延遲建立</h3>
+<p>一開始只建立常數 0 的變數並固定為假。證明需要某個閘時，<code>satVarOf()</code> 才遞迴地把它的 fanin 錐加進求解器：
+PI 一個變數；UNDEF 一個<em>自由</em>變數；AND 閘一個變數 c 加上三個子句
+<code>(¬c ∨ a)</code>、<code>(¬c ∨ b)</code>、<code>(c ∨ ¬a ∨ ¬b)</code>，即 c ↔ a ∧ b。
+只有實際被比較的閘才進入模型，MiniSat 每次回答時需要指定值的變數因此少很多。</p>
+<div class="note">
+<strong>UNDEF 用自由變數而不是 0。</strong>合併必須在「那個沒定義的訊號不論是什麼值」時都成立才安全，
+所以證明時把它當成未知數。模擬仍依規格把它當 0，因此反例會額外記下 UNDEF 在 SAT 模型裡的值，模擬反例時套用，
+確保反例真的能把兩個閘分開。
+</div>
+<h3>一輪的流程</h3>
+<ol>
+  <li><strong>挑代表</strong>：依 DFS 順序走，每組第一個走到的成員是代表（組裡有常數 0 就是常數 0）。之後的成員只和代表比。</li>
+  <li><strong>結構檢查</strong>：如果成員和代表的兩條 fanin 邊完全相同（順序可以對調），必然等價，直接合併，不問 SAT。
+    前面的合併經常讓這種情況出現。</li>
+  <li><strong>SAT</strong>：在假設 <code>g ⊕ (r ^ 相位) = 1</code> 下求解。
+    <ul>
+      <li><strong>UNSAT</strong>：兩者對所有輸入都相等，<code>mergeGate(g, r)</code>。同時把 <code>g ≡ r</code> 以子句永久加入求解器
+        （對常數 0 就是把 g 固定為假）。這個關係本來就被電路蘊含，不會改變任何答案，但後面的證明不必再從頭推導一次。</li>
+      <li><strong>SAT</strong>：模型就是一組能分辨兩者的輸入。錐內的 PI 取模型的值，錐外的 PI 取隨機值（讓這個反例也有機會分開別的群組），
+        存成反例。每存滿 64 個就模擬一次、切分群組，再重新挑代表；後面的閘就不必為已被分開的對象呼叫 SAT。</li>
+    </ul></li>
+  <li><strong>收尾</strong>：模擬剩下不滿 64 個的反例；重建 DFS，把已合併的閘和走不到 PO 的閘移出群組。群組非空就再做一輪。</li>
+</ol>
+<p>全部群組清空後再做一次結構雜湊，因為合併可能讓原本不同的閘變成結構相同。</p>
+<h3>正確性</h3>
+<ul>
+  <li><strong>不會產生迴圈</strong>：代表在 DFS 後序中比 g 早，所以代表不可能在 g 的 fanout 錐裡；把 g 的 fanout 改接到代表不會形成迴路。</li>
+  <li><strong>一定會結束</strong>：每一輪每個群組至少有一個非代表成員被處理，結果不是合併（群組變小）就是被反例分開（群組變細）。
+    群組的總成員數嚴格遞減，不會無限進行。</li>
+  <li><strong>合併都正確</strong>：只有在 SAT 證明（或 fanin 完全相同）時才合併，而加入求解器的等價子句都是已被證明、被電路蘊含的事實。</li>
+</ul>
+<h3>成本</h3>
+<p>每輪的非 SAT 工作是 O(n)；SAT 呼叫在最壞情況是指數時間。實際速度由 SAT 呼叫的次數和每次的大小決定，
+所以本實作的優化都集中在「少問」（結構檢查、反例批次切分）和「問小題目」（延遲建立、加入已證明的等價）。</p>
+
+<h2>6.8 CIRVerify：獨立的等價檢查</h2>
+<p><strong>問題</strong>：fraig 的結果不唯一，不能和參考程式逐字比對；而 fraig 若有 bug，電路會「看起來正常但算錯」。
+因此需要直接回答：目前的電路和讀進來的原檔，是否對所有輸入都有相同的輸出？</p>
+<p><strong>刻意獨立</strong>：檢查器解析 AIGER 文字（原檔快照，以及把目前電路寫成的文字），建在自己的小型圖結構上，
+完全不使用 <code>CirGate</code> 或 <code>CirMgr</code>。這樣網表程式碼的 bug 不可能同時弄壞檢查器。
+兩個電路的 PI 依位置配對；UNDEF 是自由變數，依變數編號在兩個電路間共用。</p>
+<p><strong>做法</strong>：兩個電路建進同一張結構雜湊圖 <code>Graph</code>，相同的 AND 節點只建一次，然後依序：</p>
+<ol>
+  <li><strong>結構</strong>：兩個輸出落在同一個節點（同相位）就等價，不用 SAT。</li>
+  <li><strong>隨機模擬</strong>：16 × 64 個樣本；某對輸出的值不同就立刻得到反例。</li>
+  <li><strong>SAT sweeping</strong>（<code>SatSweeper</code>）：依拓撲順序處理每個 AND 節點。先把它的 fanin 換成「已證明的代表」，
+    再查一次結構雜湊，命中就合併（大多數節點在這裡解決）；否則找模擬簽章相同（可差一個反相）的較早節點，用 SAT 證明。
+    證明成功就把等式加入求解器，之後的 SAT 問題只需處理「已證明點」之間的一小塊區域；失敗得到的反例每 64 個模擬一次，切細候選群組。
+    CNF 同樣是延遲建立。</li>
+  <li><strong>收尾</strong>：剩下的輸出對，代表相同就等價，否則再做一次 SAT。不等價時回報每個 PI 的值，
+    並且<em>重新模擬確認</em>兩邊輸出真的不同才回報。</li>
+</ol>
+<p>SAT sweeping 的效果：只有一個輸出的 sim12，把整個輸出錐一次交給 SAT 要 35 秒，sweeping 後不到 1 秒。
+檢查器本身也被測試：<code>tests/verifier_selftest.sh</code> 故意把電路改壞（翻轉一個反相、把 fanin 換成 PI 或常數），
+結論與反例必須和參考程式一致。</p>
+
+<h2>6.9 流程規則</h2>
+<p><code>CirMgr</code> 記錄上一個改電路的步驟 <code>_lastStep</code>，<code>whyNot(next)</code> 回答「下一步能不能做」：</p>
+<pre><code>std::optional&lt;std::string_view&gt; CirMgr::whyNot(CirStep next) const {
+   switch (next) {
+   case CirStep::Optimize: if (_lastStep == Simulate) return "...simulated!! Do \"CIRFraig\" first!!"; break;
+   case CirStep::Strash:   if (_lastStep == Strash)   return "...has been strashed!!";
+                           if (_lastStep == Simulate) return "...simulated!! ..."; break;
+   case CirStep::Fraig:    if (_lastStep != Simulate) return "...not yet simulated!!"; break;
+   default: break;
+   }
+   return std::nullopt;     // 可以做
+}</code></pre>
+<p>規則集中在一個地方，指令只負責印出回傳的訊息；GUI 也用同一份規則決定按鈕的啟用狀態。
+fraig 內部的結構雜湊呼叫的是不更新 <code>_lastStep</code> 的私有版本，所以 fraig 之後仍可以 strash。</p>
+
+<!-- ========================================================= -->
+<h1 id="s7">7. 圖形介面</h1>
+<h2>7.1 伺服器</h2>
+<table class="keep">
+<tr><th style="width:24%">端點</th><th>作用</th></tr>
+<tr><td><code>GET /</code></td><td>網頁本身（內嵌在執行檔裡，任何目錄都能啟動）</td></tr>
+<tr><td><code>GET /api/state</code></td><td>執行 <code>CIRJson</code>，回傳電路與目前的流程狀態</td></tr>
+<tr><td><code>POST /api/cmd</code></td><td>body 是一行指令；交給背景執行緒，立即回 202（已有指令在跑時回 409）</td></tr>
+<tr><td><code>GET /api/job</code></td><td>目前指令的進度；完成後附上輸出與新的電路狀態</td></tr>
+<tr><td><code>GET /api/files</code></td><td>目前目錄下的 <code>.aag</code> 檔（以 <code>std::filesystem</code> 列出）</td></tr>
+</table>
+<p><strong>背景工作</strong>：fraig 和 verify 在大電路上要跑數十秒，HTTP 迴圈不自己執行指令，而是交給一個工作執行緒，
+網頁定期輪詢。一次只跑一個指令。工作執行緒把 <code>cout</code>／<code>cerr</code> 導到一個加鎖的 <code>streambuf</code>；
+指令本來就以 <code>\r</code> 覆寫的方式印進度（例如 CIRVerify 的 <code>Sweeping nodes 2048/133151</code>），伺服器取最後一段文字當進度，
+網頁看到「數字/數字」就畫成進度條。因此進度不需要任何額外的 API，CLI 和 GUI 看到的是同一份文字。</p>
+<p>伺服器只綁 127.0.0.1，同網路的其他電腦連不到。</p>
+
+<h2>7.2 版面與呈現</h2>
+<ul>
+  <li><strong>分層畫法</strong>：欄是邏輯深度（PI、常數、UNDEF 在第 0 欄；AND 閘 = 最深的 fanin + 1；PO 在最後一欄），
+    欄內依 fanin 的平均位置排序（barycenter heuristic），讓大多數邊變短。O(V + E) 加上排序。</li>
+  <li><strong>看到變化</strong>：每個指令前後比對網表。被移除的閘以紅色淡出，fanin 被改接的閘以橘色標示，
+    其餘的閘從舊位置平滑移到新位置。</li>
+  <li><strong>FEC 著色</strong>：模擬後同一群組同色，fraig 後可以看到它們被合併。</li>
+  <li><strong>流程規則</strong>：按鈕依規則啟用或停用，停用時滑鼠停留會顯示原因。</li>
+  <li><strong>大電路</strong>：使用 canvas 繪圖；超過 3000 個閘改畫直線、縮小時不畫標籤；超過 20000 個閘不做移動動畫。
+    約 8.5 萬個閘的電路仍可開啟與操作。</li>
+</ul>
+
+<!-- ========================================================= -->
+<h1 id="s8">8. 測試與驗證</h1>
+<p>fraig 的正確性有兩個面向：<em>報告</em>（輸出格式、錯誤訊息）要和規格一致；<em>化簡</em>要保持功能。
+前者可以逐字比對，後者必須證明等價。測試依這兩個面向設計：</p>
+<table class="keep">
+<tr><th style="width:24%">方法</th><th>內容</th><th style="width:16%">需要參考程式</th></tr>
+<tr><td>黃金輸出（59 個）</td><td><code>tests/cases.txt</code> 列出電路與指令，輸出和預先驗證過的結果逐字比對；fraig 的案例以 <code>CIRVerify</code> 結尾，測試本身就證明了等價</td><td>否</td></tr>
+<tr><td>隨機電路（200 個）</td><td>隨機產生含 UNDEF、未使用閘、常數輸入、重複 fanin 等邊界情況的電路，跑完整流程後必須通過 <code>CIRVerify</code></td><td>否</td></tr>
+<tr><td>單元測試（32 個，GoogleTest）</td><td>每個改電路的指令之後呼叫 <code>CirMgr::checkInvariants()</code>（fanin 與 fanout 互相一致、DFS 順序、計數）；邊與閘型別的行為；流程規則</td><td>否</td></tr>
+<tr><td>差分測試</td><td><code>tests/fuzz_diff.sh</code>：數千個隨機電路的 7 種指令流程與參考程式逐字比對</td><td>是</td></tr>
+<tr><td>Parser 模糊測試</td><td><code>tests/fuzz_parser.sh</code>：把正確檔案隨機弄壞，錯誤訊息必須和參考程式一致，且不能崩潰</td><td>是</td></tr>
+<tr><td>驗證器自我測試</td><td><code>tests/verifier_selftest.sh</code>：故意改壞電路，<code>CIRVerify</code> 的結論與反例必須和參考程式一致</td><td>是</td></tr>
+<tr><td>Sanitizer、valgrind</td><td>AddressSanitizer + UBSan 版本跑全部測試；valgrind 無錯誤、結束時沒有未釋放的記憶體</td><td>否</td></tr>
+</table>
+<p>前四項（共 92 個）在 <code>ctest</code> 裡執行，不需要參考程式。GitHub Actions 在每次 push 與 pull request 時，
+以 g++ 和 clang++（警告視為錯誤）以及 sanitizer 版本各跑一次。需要參考程式的工具只在開發時用來除錯，
+成品的正確性不依賴參考程式。</p>
+
+<!-- ========================================================= -->
+<h1 id="s9">9. 效能</h1>
+<p>和課程提供的參考程式在同一台機器、同一次量測中比較（雲端 Linux、2 CPU、g++ 13、<code>-O3</code>；<code>scripts/bench.py</code>）：</p>
+<table class="keep">
+<tr><th>電路</th><th>流程</th><th class="n">參考程式</th><th class="n">fraig</th><th>最後 AIG 數（參考／fraig）</th></tr>
+<tr><td>sim07</td><td>隨機模擬 → fraig → sweep → optimize</td><td class="n">6.41 s</td><td class="n">1.49 s</td><td>1175 / 1175</td></tr>
+<tr><td>sim12</td><td>同上</td><td class="n">2.12 s</td><td class="n">0.29 s</td><td>0 / 0</td></tr>
+<tr><td>sim06</td><td>同上</td><td class="n">0.30 s</td><td class="n">0.13 s</td><td>531 / 531</td></tr>
+<tr><td>C7552</td><td>同上</td><td class="n">0.39 s</td><td class="n">0.09 s</td><td>497 / 497</td></tr>
+<tr><td>C5315</td><td>同上</td><td class="n">0.16 s</td><td class="n">0.05 s</td><td>1001 / 1001</td></tr>
+<tr><td>sim13（約 8.5 萬閘）</td><td>同上</td><td class="n">69.8 s</td><td class="n">21.8 s</td><td>77313 / 77261</td></tr>
+<tr><td>sim13</td><td>隨機模擬</td><td class="n">10.7 s</td><td class="n">1.9 s</td><td>—</td></tr>
+<tr><td>sim13</td><td>讀 76 MB 樣本檔模擬</td><td class="n">1.17 s</td><td class="n">1.15 s</td><td>—</td></tr>
+</table>
+<p>sim13 的 fraig 流程記憶體用量為 38 MB（參考程式 50 MB）。fraig 有時合併得比參考程式多（sim13：77261 對 77313），
+每個結果都經 <code>CIRVerify</code> 證明與原電路等價；sim13 的 fraig 加上驗證共約 107 秒。</p>
+<h3>速度從哪裡來</h3>
+<ul>
+  <li><strong>延遲建立 SAT 模型</strong>：只有被比較的閘的 fanin 錐進入求解器，每次求解需要指定值的變數大幅減少。</li>
+  <li><strong>加入已證明的等價</strong>：後面的證明可以直接使用，不必從頭推導。剖析顯示 fraig 的時間幾乎都在 MiniSat 的 propagate，
+    這兩項正是讓 propagate 處理的東西變少。</li>
+  <li><strong>fanin 相同就不問 SAT</strong>，以及<strong>反例批次模擬</strong>：減少 SAT 呼叫次數。</li>
+  <li><strong>模擬的快速路徑</strong>：群組沒被切開時不建雜湊表，sim13 的隨機模擬因此快了約 44%。</li>
+</ul>
+<p>每一項優化都以交錯執行的 A/B 量測（<code>scripts/ab_bench.sh</code>）確認效果、並確認輸出不變後才採用。</p>
+
+<!-- ========================================================= -->
+<h1 id="s10">10. 複雜度總表、限制與未來工作</h1>
+<h2>10.1 複雜度總表</h2>
+<table class="keep">
+<tr><th>指令</th><th>時間</th><th>主要結構</th></tr>
+<tr><td>CIRRead</td><td>O(檔案大小)</td><td>以 ID 直接索引的陣列</td></tr>
+<tr><td>CIRSWeep</td><td>O(n + e)</td><td>標記 + 依 ID 掃描</td></tr>
+<tr><td>CIROPTimize</td><td>O(n + e)</td><td>一遍 DFS</td></tr>
+<tr><td>CIRSTRash</td><td>平均 O(n + e)</td><td><code>unordered_map</code></td></tr>
+<tr><td>CIRSIMulate</td><td>每 64 個樣本 O(n)</td><td>64 位元字 + 雜湊切分</td></tr>
+<tr><td>CIRFraig</td><td>每輪 O(n) + SAT 呼叫</td><td>MiniSat、延遲 CNF、反例批次模擬</td></tr>
+<tr><td>CIRVerify</td><td>O(n) + SAT 呼叫</td><td>結構雜湊圖、SAT sweeping</td></tr>
+<tr><td>CIRPrint、CIRWrite、CIRJson</td><td>O(n + e)</td><td>DFS 清單</td></tr>
+<tr><td>CIRGate -FANIn/-FANOut</td><td>O(輸出大小)</td><td>走訪標記</td></tr>
+</table>
+<p>SAT 部分沒有多項式時間保證；能做的是減少呼叫次數、縮小每次的問題。</p>
+
+<h2>10.2 限制</h2>
+<ul>
+  <li>只處理組合電路（AIGER 的 latch 數必須為 0），只支援 ASCII 格式。</li>
+  <li>使用的 MiniSat 版本沒有衝突數上限，極難的 SAT 問題無法中途放棄；GUI 目前也不能取消執行中的指令。</li>
+  <li>GUI 在數萬個閘以上仍可使用，但拖曳與縮放會變慢；它的用途是觀察中小型電路的化簡過程。</li>
+</ul>
+
+<h2>10.3 未來工作</h2>
+<ul>
+  <li>為 SAT 呼叫加上衝突上限，超過就放棄這一對（保持正確，只是少合併一些），讓最壞情況的時間有界。</li>
+  <li>支援二進位 AIGER（<code>.aig</code>）與 latch（序向電路），後者需要以 latch 輸出為自由變數做組合部分的化簡。</li>
+  <li>GUI 支援取消指令，以及只顯示某個閘的 fanin／fanout 錐，讓大電路也容易觀察。</li>
+  <li>以 cut-based rewriting 等方法做更強的結構化簡，與 FRAIG 互補。</li>
+</ul>
+
+<h2>10.4 專題緣起與參考文獻</h2>
+<p>本專題延伸自國立臺灣大學電機系「資料結構與程式設計」（DSnP）課程的 FRAIG 期末專題。在完成課程要求的功能之後，
+進一步加入獨立的等價檢查器、瀏覽器圖形介面與效能優化，並改寫成現代 C++ 工程專案。課程提供的規格、測資、參考程式與框架程式碼經課程同意收錄於 repository 中。</p>
+<ol>
+  <li>A. Mishchenko, J.-H. R. Jiang, S. Chatterjee, R. K. Brayton, “FRAIGs: Functionally Reduced AND-INV Graphs,” UC Berkeley. https://people.eecs.berkeley.edu/~alanmi/research/fraigs/</li>
+  <li>N. Eén, N. Sörensson, “An Extensible SAT-solver,” SAT 2003（MiniSat）. http://minisat.se/</li>
+  <li>A. Biere, “The AIGER And-Inverter Graph (AIG) Format.” https://fmv.jku.at/aiger/</li>
+  <li>GoogleTest. https://github.com/google/googletest</li>
+</ol>
+
+</body>
+</html>

@@ -1,0 +1,17 @@
+fraig> cirr tests.fraig/test1.aag
+
+fraig> cirp
+
+Circuit Statistics
+==================
+  PI         178
+  PO         123
+  AIG       1009
+------------------
+  Total     1310
+
+fraig> cirp -fl
+Gates defined but not used  : 123 131 142 145 154 157 166 169 264 269 2720 2912 3180 3378
+
+fraig> q -f
+

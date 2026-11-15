@@ -1,0 +1,9 @@
+fraig> cirr tests.fraig/sim01.aag
+
+fraig> cirsim -f tests.fraig/no-such-file
+Error: cannot open file "tests.fraig/no-such-file"!!
+
+fraig> cirp -fec
+
+fraig> q -f
+

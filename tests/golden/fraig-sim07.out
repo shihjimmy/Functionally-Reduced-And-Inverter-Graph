@@ -1,0 +1,28 @@
+fraig> cirr tests.fraig/sim07.aag
+
+fraig> cirsim -r
+2112 patterns simulated.
+
+fraig> cirfraig
+
+fraig> cirsw
+
+fraig> ciropt
+
+fraig> cirp
+
+Circuit Statistics
+==================
+  PI           4
+  PO         195
+  AIG       1175
+------------------
+  Total     1374
+
+fraig> cirv
+Verifying against "tests.fraig/sim07.aag"...
+195 outputs: 10 identical by structure, 185 proven by SAT, 0 different.
+Result: EQUIVALENT
+
+fraig> q -f
+

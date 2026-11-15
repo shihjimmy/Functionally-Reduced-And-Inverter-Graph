@@ -1,0 +1,12 @@
+fraig> cirr tests.fraig/sim01.aag
+
+fraig> cirstrash
+
+fraig> cirsim -f tests.fraig/pattern.01
+32 patterns simulated.
+
+fraig> cirp -fec
+[0] 6 !8
+
+fraig> q -f
+

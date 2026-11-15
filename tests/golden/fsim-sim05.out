@@ -1,0 +1,13 @@
+fraig> cirr tests.fraig/sim05.aag
+
+fraig> cirstrash
+
+fraig> cirsim -f tests.fraig/pattern.05
+
+Error: Pattern(1a) contains a non-0/1 character('a').
+0 patterns simulated.
+
+fraig> cirp -fec
+
+fraig> q -f
+

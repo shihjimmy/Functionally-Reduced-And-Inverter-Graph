@@ -1,0 +1,24 @@
+fraig> cirr tests.fraig/sim05.aag
+
+fraig> cirfraig
+Error: circuit is not yet simulated!!
+
+fraig> cirstrash
+
+fraig> cirstrash
+Error: circuit has been strashed!!
+
+fraig> cirsim -r
+320 patterns simulated.
+
+fraig> ciropt
+Error: circuit has been simulated!! Do "CIRFraig" first!!
+
+fraig> cirstrash
+Error: circuit has been simulated!! Do "CIRFraig" first!!
+
+fraig> cirp -pi
+PIs of the circuit: 1 2
+
+fraig> q -f
+

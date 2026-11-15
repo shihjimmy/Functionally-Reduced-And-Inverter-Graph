@@ -1,0 +1,14 @@
+fraig> cirr tests.fraig/strash07.aag
+
+fraig> cirstrash
+
+fraig> cirp -n
+
+[0] PI  1
+[1] PI  2
+[2] AIG 3 1 2
+[3] AIG 5 3 3
+[4] PO  6 5
+
+fraig> q -f
+

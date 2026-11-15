@@ -1,0 +1,88 @@
+# Test cases for tests/golden.sh.      name | circuit | commands (';' separated)
+#
+# Names starting with "fraig-" end with CIRVerify, our own equivalence
+# checker: the golden output then contains "Result: EQUIVALENT", i.e. the
+# test itself proves that fraig did not change the function.  ("fraig-"
+# output is not compared with the reference binary: our fraig may merge more.)
+# Names starting with "verify-" test CIRVerify itself (the reference binary
+# has no such command).  All other cases are identical to the reference
+# binary (tests/check_against_ref.sh).
+
+# --- parsing and reports -----------------------------------------------------
+report-test2   | tests.fraig/test2.aag        | cirp; cirp -pi; cirp -po; cirp -n; cirp -fl; cirg 6; cirg 6 -fi 2; cirg 6 -fo 2
+report-sim05   | tests.fraig/sim05.aag        | cirp; cirp -pi; cirp -po; cirp -n; cirp -fl; cirg 9; cirg 9 -fi 3; cirg 9 -fo 3
+report-C17     | tests.fraig/ISCAS85/C17.aag  | cirp; cirp -n; cirg 10 -fi 3
+report-test1   | tests.fraig/test1.aag        | cirp; cirp -fl
+
+# --- sweep -------------------------------------------------------------------
+sweep-opt01 | tests.fraig/opt01.aag | cirsw; cirp -n
+sweep-opt02 | tests.fraig/opt02.aag | cirsw; cirp -n
+sweep-opt03 | tests.fraig/opt03.aag | cirsw; cirp -n
+sweep-opt04 | tests.fraig/opt04.aag | cirsw; cirp -n
+sweep-opt05 | tests.fraig/opt05.aag | cirsw; cirp -n
+sweep-opt06 | tests.fraig/opt06.aag | cirsw; cirp -n
+sweep-opt07 | tests.fraig/opt07.aag | cirsw; cirp -n
+sweep-test1 | tests.fraig/test1.aag | cirsw; cirp
+
+# --- optimize ----------------------------------------------------------------
+opt-opt01 | tests.fraig/opt01.aag | cirsw; ciropt; cirp -n
+opt-opt02 | tests.fraig/opt02.aag | cirsw; ciropt; cirp -n
+opt-opt03 | tests.fraig/opt03.aag | cirsw; ciropt; cirp -n
+opt-opt04 | tests.fraig/opt04.aag | cirsw; ciropt; cirp -n
+opt-opt05 | tests.fraig/opt05.aag | cirsw; ciropt; cirp -n
+opt-opt06 | tests.fraig/opt06.aag | cirsw; ciropt; cirp -n
+opt-opt07 | tests.fraig/opt07.aag | cirsw; ciropt; cirp -n
+opt-test1 | tests.fraig/test1.aag | ciropt; cirsw; cirp
+
+# --- strash ------------------------------------------------------------------
+strash-strash01 | tests.fraig/strash01.aag | cirstrash; cirp -n
+strash-strash02 | tests.fraig/strash02.aag | cirstrash; cirp -n
+strash-strash03 | tests.fraig/strash03.aag | cirstrash; cirp -n
+strash-strash04 | tests.fraig/strash04.aag | cirstrash; cirp -n
+strash-strash05 | tests.fraig/strash05.aag | cirstrash; cirp -n
+strash-strash06 | tests.fraig/strash06.aag | cirstrash; cirp -n
+strash-strash07 | tests.fraig/strash07.aag | cirstrash; cirp -n
+strash-strash08 | tests.fraig/strash08.aag | cirstrash; cirp -n
+strash-strash09 | tests.fraig/strash09.aag | cirstrash; cirp -n
+strash-strash10 | tests.fraig/strash10.aag | cirstrash; cirp -n
+
+# --- simulation from a pattern file (FEC groups) -------------------------------
+fsim-sim01 | tests.fraig/sim01.aag | cirstrash; cirsim -f tests.fraig/pattern.01; cirp -fec
+fsim-sim02 | tests.fraig/sim02.aag | cirstrash; cirsim -f tests.fraig/pattern.02; cirp -fec
+fsim-sim03 | tests.fraig/sim03.aag | cirstrash; cirsim -f tests.fraig/pattern.03; cirp -fec
+fsim-sim04 | tests.fraig/sim04.aag | cirstrash; cirsim -f tests.fraig/pattern.04; cirp -fec
+fsim-sim05 | tests.fraig/sim05.aag | cirstrash; cirsim -f tests.fraig/pattern.05; cirp -fec
+fsim-sim06 | tests.fraig/sim06.aag | cirstrash; cirsim -f tests.fraig/pattern.06; cirp -fec
+fsim-sim08 | tests.fraig/sim08.aag | cirstrash; cirsim -f tests.fraig/pattern.08; cirp -fec
+
+# --- simulation: error messages --------------------------------------------------
+err-fsim-length | tests.fraig/sim01.aag | cirsim -f tests.fraig/pattern.04; cirp -fec
+err-fsim-nofile | tests.fraig/sim01.aag | cirsim -f tests.fraig/no-such-file; cirp -fec
+err-fraig-nosim | tests.fraig/sim01.aag | cirfraig; cirp
+
+# --- fraig: checked by equivalence, not by the reference -------------------------
+fraig-sim01    | tests.fraig/sim01.aag        | cirsim -r; cirfraig; cirp -n; cirv
+fraig-sim02    | tests.fraig/sim02.aag        | cirsim -r; cirfraig; cirp -n; cirv
+fraig-sim05    | tests.fraig/sim05.aag        | cirsim -r; cirfraig; cirp -n; cirv
+fraig-strash05 | tests.fraig/strash05.aag     | cirstrash; cirsim -r; cirfraig; cirp -n; cirv
+fraig-sim06    | tests.fraig/sim06.aag        | cirsim -r; cirfraig; cirp; cirv
+fraig-sim07    | tests.fraig/sim07.aag        | cirsim -r; cirfraig; cirsw; ciropt; cirp; cirv
+fraig-C432     | tests.fraig/ISCAS85/C432.aag | cirsim -r; cirfraig; cirp; cirv
+fraig-C880     | tests.fraig/ISCAS85/C880.aag | cirsim -r; cirfraig; cirp; cirv
+
+# --- CIRVerify itself ------------------------------------------------------------
+# sim05_broken.aag = sim05.aag with output 0 inverted: found by simulation.
+# and20 vs zero20 differ on 1 of 2^20 patterns: the SAT path must find it.
+verify-broken-sim05 | tests.fraig/sim05.aag   | cirv -f tests/data/sim05_broken.aag
+verify-sat-cex      | tests/data/and20.aag    | cirv -f tests/data/zero20.aag
+verify-same-file    | tests/data/and20.aag    | cirv -f tests/data/and20.aag
+verify-all-opts     | tests.fraig/test1.aag   | cirsw; ciropt; cirstrash; cirv
+verify-undef        | tests.fraig/strash05.aag | cirstrash; cirsim -r; cirfraig; cirsw; ciropt; cirv
+verify-err-nofile   | tests.fraig/sim01.aag   | cirv -f tests/data/no-such-file.aag
+verify-err-inputs   | tests.fraig/sim01.aag   | cirv -f tests/data/and20.aag
+verify-err-nocir    | tests.fraig/sim01.aag   | cirr -r tests/data/no-such-file.aag; cirv
+
+# --- flow rules (stage 8 moved them from the command layer into CirMgr) --------
+flow-errors      | tests.fraig/sim05.aag | cirfraig; cirstrash; cirstrash; cirsim -r; ciropt; cirstrash; cirp -pi
+flow-after-fraig | tests.fraig/sim05.aag | cirsim -r; cirfraig; cirstrash; ciropt; cirstrash; cirp -pi
+flow-reread      | tests.fraig/sim05.aag | cirsim -r; cirr -r tests.fraig/sim05.aag; ciropt; cirfraig; cirp -pi

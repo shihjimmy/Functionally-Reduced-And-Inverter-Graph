@@ -1,0 +1,25 @@
+fraig> cirr tests.fraig/opt06.aag
+
+fraig> cirsw
+
+fraig> cirp -n
+
+[0] CONST0
+[1] PI  1
+[2] AIG 3 0 1
+[3] AIG 4 3 !0
+[4] AIG 5 0 4
+[5] PI  2
+[6] AIG 7 1 !2
+[7] AIG 8 !7 !7
+[8] AIG 6 !5 8
+[9] AIG 11 6 8
+[10] AIG 10 6 7
+[11] AIG 9 7 7
+[12] AIG 12 6 9
+[13] AIG 13 !10 12
+[14] AIG 14 11 !13
+[15] PO  15 14
+
+fraig> q -f
+

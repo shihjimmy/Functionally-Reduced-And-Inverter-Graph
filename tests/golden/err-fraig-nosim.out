@@ -1,0 +1,17 @@
+fraig> cirr tests.fraig/sim01.aag
+
+fraig> cirfraig
+Error: circuit is not yet simulated!!
+
+fraig> cirp
+
+Circuit Statistics
+==================
+  PI           3
+  PO           2
+  AIG          5
+------------------
+  Total       10
+
+fraig> q -f
+

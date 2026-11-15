@@ -1,0 +1,9 @@
+fraig> cirr tests/data/and20.aag
+
+fraig> cirv -f tests/data/and20.aag
+Verifying against "tests/data/and20.aag"...
+1 outputs: 1 identical by structure, 0 proven by SAT, 0 different.
+Result: EQUIVALENT
+
+fraig> q -f
+

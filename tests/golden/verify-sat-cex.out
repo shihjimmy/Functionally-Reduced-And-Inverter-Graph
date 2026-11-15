@@ -1,0 +1,10 @@
+fraig> cirr tests/data/and20.aag
+
+fraig> cirv -f tests/data/zero20.aag
+Verifying against "tests/data/zero20.aag"...
+1 outputs: 0 identical by structure, 0 proven by SAT, 1 different.
+  Output 0 differs for PI values (PI 0 first): 11111111111111111111
+Result: NOT EQUIVALENT
+
+fraig> q -f
+

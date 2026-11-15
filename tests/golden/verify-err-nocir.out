@@ -1,0 +1,11 @@
+fraig> cirr tests.fraig/sim01.aag
+
+fraig> cirr -r tests/data/no-such-file.aag
+Note: original circuit is replaced...
+Cannot open design "tests/data/no-such-file.aag"!!
+
+fraig> cirv
+Error: circuit is not yet constructed!!
+
+fraig> q -f
+

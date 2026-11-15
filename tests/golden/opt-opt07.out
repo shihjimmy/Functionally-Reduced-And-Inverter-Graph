@@ -1,0 +1,15 @@
+fraig> cirr tests.fraig/opt07.aag
+
+fraig> cirsw
+
+fraig> ciropt
+
+fraig> cirp -n
+
+[0] PI  2
+[1] PI  3
+[2] AIG 4 2 3
+[3] PO  11 4
+
+fraig> q -f
+
